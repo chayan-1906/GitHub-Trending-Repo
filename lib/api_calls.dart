@@ -27,7 +27,7 @@ class Apis {
       Navigator.pushReplacement(
         context,
         PageTransition(
-          child: NetworkErrorScreen(),
+          child: const NetworkErrorScreen(),
           type: PageTransitionType.rippleRightUp,
         ),
       );

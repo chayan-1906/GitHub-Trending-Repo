@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:trending_git_repo/splash_screen.dart';
-
-import 'screens/home_screen.dart';
+import 'package:trending_git_repo/screens/splash_screen.dart';
 
 void main() {
   runApp(const MyApp());

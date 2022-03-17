@@ -1,149 +1,102 @@
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_icons/flutter_icons.dart';
 import 'package:flutter_page_transition/flutter_page_transition.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:trending_git_repo/api_calls.dart';
-import 'package:trending_git_repo/global_functions/check_invalid_string.dart';
-import 'package:trending_git_repo/screens/network_error_screen.dart';
-import 'package:trending_git_repo/services/shared_preference_service.dart';
-import 'package:trending_git_repo/widgets/expandable_container.dart';
+import 'package:trending_git_repo/screens/home_screen.dart';
 
+import '../api_calls.dart';
+import '../global_functions/check_invalid_string.dart';
 import '../models/git_repo_model.dart';
-import '../widgets/shimmer_widget.dart';
-import 'offline_home_screen.dart';
+import '../services/shared_preference_service.dart';
+import '../widgets/expandable_container.dart';
+import 'network_error_screen.dart';
 
-class HomeScreen extends StatefulWidget {
-  final List<dynamic> trendingRepos;
+class OfflineHomeScreen extends StatefulWidget {
+  final Map<String, List<dynamic>> selectedRepoLang;
 
-  // final String isComingFrom;
-
-  const HomeScreen({
-    Key key,
-    this.trendingRepos,
-    // this.isComingFrom,
-  }) : super(key: key);
+  const OfflineHomeScreen({Key key, this.selectedRepoLang}) : super(key: key);
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _OfflineHomeScreenState createState() => _OfflineHomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  bool loading = false;
-  List<dynamic> trendingRepos = [];
+class _OfflineHomeScreenState extends State<OfflineHomeScreen> {
+  Map<String, List<dynamic>> selectedRepoLang = {};
   bool isExpanded = false;
   String tapped = '';
-  Map<String, List<dynamic>> selectedRepoLang = {};
+  List<dynamic> trendingRepos = [];
   String encodedRepoFromJson = '';
   List<String> encodedTrendingRepos = [];
   SharedPreferenceService sharedPreferenceService = SharedPreferenceService();
-  String expandedCardValue;
-  Map<String, List<dynamic>> storedSelectedRepoLang;
 
   Future<http.Response> callTrendingRepoApi() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
     List<String> storedSelectedRepoLang = sharedPreferences
             .getStringList(SharedPreferenceService.TRENDING_REPO_LIST_KEY) ??
         [];
-    /*if (widget.isComingFrom == 'NetworkErrorScreen') {
-      sharedPreferenceService.setTrendingRepoListValue(fetchedRepos: <String>[]);
-    }*/
-    // print('46: $storedSelectedRepoLang');
-    if (storedSelectedRepoLang.isNotEmpty) {
-      /// if sharedPreferences list is not empty
+
+    /// if sharedPreferences list is empty
+    // setState(() {
+    //   loading = true;
+    // });
+    http.Response response = await Apis().trendingRepoApi(context: context);
+    if (response.statusCode == 200) {
+      print('Successful');
       trendingRepos.clear();
-      for (var element in storedSelectedRepoLang) {
-        trendingRepos.add(json.decode(element));
+      final repoListFromResponse = jsonDecode(response.body);
+      for (var repoInJson in repoListFromResponse) {
+        var repoFromJson = GitRepoModel.fromJson(repoInJson);
+        encodedRepoFromJson = jsonEncode(repoFromJson.toMap());
+        trendingRepos.add(repoFromJson);
+        encodedTrendingRepos.add(encodedRepoFromJson);
       }
-      print('50: $trendingRepos');
+
+      print('87: $trendingRepos');
+
+      /// store list in shared preferences
+      sharedPreferenceService.setTrendingRepoListValue(
+          fetchedRepos: encodedTrendingRepos);
+      // print(expandedCardValue);
       for (var trendingRepoItem in trendingRepos) {
         selectedRepoLang.addEntries([
           MapEntry(
             /// key
-            trendingRepoItem['language'],
+            trendingRepoItem.language,
 
             /// value
             trendingRepos
                 .where((trendingRepo) =>
-                    trendingRepo['language'] == trendingRepoItem['language'])
+                    trendingRepo.language == trendingRepoItem.language)
                 .toList(),
           ),
         ]);
       }
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) {
-          return OfflineHomeScreen(selectedRepoLang: selectedRepoLang);
-        }),
-      );
     } else {
-      /// if sharedPreferences list is empty
-      setState(() {
-        loading = true;
-      });
-      http.Response response = await Apis().trendingRepoApi(context: context);
-      if (response.statusCode == 200) {
-        print('Successful');
-        trendingRepos.clear();
-        final repoListFromResponse = jsonDecode(response.body);
-        for (var repoInJson in repoListFromResponse) {
-          var repoFromJson = GitRepoModel.fromJson(repoInJson);
-          encodedRepoFromJson = jsonEncode(repoFromJson.toMap());
-          trendingRepos.add(repoFromJson);
-          encodedTrendingRepos.add(encodedRepoFromJson);
-        }
-
-        print('87: $trendingRepos');
-
-        /// store list in shared preferences
-        sharedPreferenceService.setTrendingRepoListValue(
-            fetchedRepos: encodedTrendingRepos);
-        // print(expandedCardValue);
-        for (var trendingRepoItem in trendingRepos) {
-          selectedRepoLang.addEntries([
-            MapEntry(
-              /// key
-              trendingRepoItem.language,
-
-              /// value
-              trendingRepos
-                  .where((trendingRepo) =>
-                      trendingRepo.language == trendingRepoItem.language)
-                  .toList(),
-            ),
-          ]);
-        }
-      } else {
-        print('Error');
-        Navigator.pushReplacement(
-          context,
-          PageTransition(
-            child: NetworkErrorScreen(refresh: refresh),
-            type: PageTransitionType.rippleRightUp,
-          ),
-        );
-      }
-      setState(() {
-        loading = false;
-      });
-      // print(selectedRepoLang);
-      return response;
+      print('Error');
+      Navigator.pushReplacement(
+        context,
+        PageTransition(
+          child: NetworkErrorScreen(refresh: refresh),
+          type: PageTransitionType.rippleRightUp,
+        ),
+      );
     }
-    return null;
-  }
-
-  refresh() async {
-    await callTrendingRepoApi();
+    // setState(() {
+    //   loading = false;
+    // });
+    // print(selectedRepoLang);
+    return response;
   }
 
   PopupMenuButton<String> showPopupMenu() {
     return PopupMenuButton(
         elevation: 8.0,
         color: Colors.white,
-        padding: EdgeInsets.all(0.0),
+        padding: const EdgeInsets.all(0.0),
         onSelected: (value) {
           print(value);
           // TODO: Navigate to favourites screen
@@ -156,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
               value: 'Favourites',
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
-                children: [
+                children: const [
                   Icon(
                     MaterialIcons.favorite,
                     color: Colors.black,
@@ -177,26 +130,21 @@ class _HomeScreenState extends State<HomeScreen> {
         });
   }
 
-  Future<void> getHasExpandedCardValue() async {
-    SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-    expandedCardValue = sharedPreferences
-            .getString(SharedPreferenceService.EXPANDED_CARD_VALUE) ??
-        'null';
-    // if (expandedCardValue != 'null') {}
-    // expandedCardValue != 'null' ? isExpanded = true : isExpanded = false;
-    print('123. expandedCardValue: $expandedCardValue');
+  refresh() async {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) {
+        return const HomeScreen();
+      }),
+    );
+    await callTrendingRepoApi();
   }
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    refresh();
-    if (widget.trendingRepos != null) {
-      trendingRepos.clear();
-      trendingRepos = widget.trendingRepos;
-    }
-    getHasExpandedCardValue();
+    selectedRepoLang = widget.selectedRepoLang;
   }
 
   @override
@@ -220,73 +168,67 @@ class _HomeScreenState extends State<HomeScreen> {
           showPopupMenu(),
         ],
       ),
-      body: loading
-          ? const ShimmerWidget()
-          : RefreshIndicator(
-              onRefresh: () => refresh(),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(10.0),
-                itemCount: selectedRepoLang.keys.length,
-                itemBuilder: (BuildContext context, int languageIndex) {
-                  // print(selectedRepoLang.keys.length);
-                  List keyLanguages = selectedRepoLang.keys.toList();
-                  List colors = [];
-                  for (var element in selectedRepoLang.values) {
-                    // print(element);
-                    String formattedColor;
-                    Color color;
-                    if (element != null &&
-                        element != 'null' &&
-                        element.isNotEmpty) {
-                      element.forEach((elementIterator) {
-                        if (!isStringInvalid(
-                            text: elementIterator.languageColor)) {
-                          /// if color is not null
-                          formattedColor =
-                              "0xFF${elementIterator.languageColor.replaceAll('#', '')}";
-                          color = Color(int.parse(formattedColor));
-                        } else {
-                          color = Color(0xFFFFFFFF);
-                        }
-                      });
-                    }
-                    colors.add(color);
+      body: RefreshIndicator(
+        onRefresh: () => refresh(),
+        child: ListView.builder(
+          padding: const EdgeInsets.all(10.0),
+          itemCount: selectedRepoLang.keys.length,
+          itemBuilder: (BuildContext context, int languageIndex) {
+            List keyLanguages = selectedRepoLang.keys.toList();
+            List colors = [];
+            for (var element in selectedRepoLang.values) {
+              String formattedColor;
+              Color color;
+              if (element != null && element.isNotEmpty) {
+                element.forEach((elementIterator) {
+                  if (!isStringInvalid(
+                      text: elementIterator['languageColor'])) {
+                    /// if color is not null
+                    formattedColor =
+                        "0xFF${elementIterator['languageColor'].replaceAll('#', '')}";
+                    color = Color(int.parse(formattedColor));
+                  } else {
+                    color = const Color(0xFFFFFFFF);
+                  }
+                });
+              }
+              colors.add(color);
             }
-                  return ListView(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    children: [
-                      /// language name
-                      Container(
-                        decoration: BoxDecoration(
-                          color: colors[languageIndex].withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(12.0),
-                          border: Border.all(
-                            color: colors[languageIndex],
-                            width: 2.0,
-                          ),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 10.0,
-                          horizontal: 15.0,
-                        ),
-                        child: Text(
-                          keyLanguages[languageIndex] ?? 'NULL LANGUAGE',
-                          style: TextStyle(
-                            fontSize: 20.0,
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+            return ListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                /// language name
+                Container(
+                  decoration: BoxDecoration(
+                    color: colors[languageIndex].withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(12.0),
+                    border: Border.all(
+                      color: colors[languageIndex],
+                      width: 2.0,
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10.0,
+                    horizontal: 15.0,
+                  ),
+                  child: Text(
+                    keyLanguages[languageIndex] ?? 'NULL LANGUAGE',
+                    style: const TextStyle(
+                      fontSize: 20.0,
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
 
-                      /// repo list of specific language
-                      repositoryList(languageIndex, width, colors),
-                    ],
-                  );
-                },
-              ),
-            ),
+                /// repo list of specific language
+                repositoryList(languageIndex, width, colors),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -301,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: values.length,
       itemBuilder: (BuildContext context, int index) {
-        print('253: $expandedCardValue');
+        // print('253: $expandedCardValue');
         // List usernames = [];
         // print(values.map((name) {
         //   print(name.username);
@@ -326,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return GestureDetector(
           onTap: () async {
             sharedPreferenceService.setHasExpandedCardValue(
-                username: values[index].username);
+                username: values[index]['username']);
             setState(() {
               isExpanded = ((tapped == null) ||
                       (('$languageIndex$index' == tapped) || !isExpanded))
@@ -344,7 +286,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Row(
                 children: [
-
                   /// profile avatar
                   SizedBox(
                     width: 50.0,
@@ -352,7 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(50.0),
                       child: CachedNetworkImage(
                         // TODO: Whose avatar url???
-                        imageUrl: values[index].builtBy[0]['avatar'],
+                        imageUrl: values[index]['builtBy'][0]['avatar'],
                         fit: BoxFit.cover,
                         height: 50.0,
                         width: 50.0,
@@ -373,17 +314,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   /// username & repo name
                   SizedBox(
-                    width: width -
-                        100.0, // screenWidth - profileAvatarWidth - padding (approx.)
+                    width: width - 100.0,
+                    // screenWidth - profileAvatarWidth - padding (approx.)
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         /// username
                         Text(
-                          !isStringInvalid(text: values[index].username)
-                              ? values[index].username
+                          !isStringInvalid(text: values[index]['username'])
+                              ? values[index]['username']
                               : 'N/A',
                           style: const TextStyle(
                             color: Colors.black,
@@ -394,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         /// repo name
                         Text(
-                          values[index].repositoryName,
+                          values[index]['repositoryName'],
                           style: const TextStyle(
                             color: Colors.black,
                             fontSize: 18.0,
@@ -413,13 +353,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Row(
                 children: [
-
                   /// profile avatar
                   ClipRRect(
                     borderRadius: BorderRadius.circular(50.0),
                     child: CachedNetworkImage(
                       // TODO: Whose avatar url???
-                      imageUrl: values[index].builtBy[0]['avatar'],
+                      imageUrl: values[index]['builtBy'][0]['avatar'],
                       fit: BoxFit.cover,
                       height: 50.0,
                       width: 50.0,
@@ -444,11 +383,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       children: [
-
                         /// username
                         Text(
-                          !isStringInvalid(text: values[index].username)
-                              ? values[index].username
+                          !isStringInvalid(text: values[index]['username'])
+                              ? values[index]['username']
                               : 'N/A',
                           style: const TextStyle(
                             color: Colors.black,
@@ -459,8 +397,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         /// repo name
                         Text(
-                          !isStringInvalid(text: values[index].repositoryName)
-                              ? values[index].repositoryName
+                          !isStringInvalid(
+                                  text: values[index]['repositoryName'])
+                              ? values[index]['repositoryName']
                               : '',
                           style: const TextStyle(
                             color: Colors.black,
@@ -470,16 +409,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 10.0),
 
                         /// description
-                        !isStringInvalid(text: values[index].description)
+                        !isStringInvalid(text: values[index]['description'])
                             ? Text(
-                          values[index].description,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15.0,
-                            color: Colors.black,
-                          ),
-                        )
+                                values[index]['description'],
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15.0,
+                                  color: Colors.black,
+                                ),
+                              )
                             : Container(),
                         const SizedBox(height: 10.0),
 
@@ -487,63 +426,64 @@ class _HomeScreenState extends State<HomeScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-
                             /// language
-                            !isStringInvalid(text: values[index].languageColor)
+                            !isStringInvalid(
+                                    text: values[index]['languageColor'])
                                 ? Row(
-                              children: [
+                                    children: [
+                                      /// language color
+                                      CircleAvatar(
+                                        radius: 5.0,
+                                        backgroundColor: colors[languageIndex],
+                                      ),
+                                      const SizedBox(width: 4.0),
 
-                                /// language color
-                                CircleAvatar(
-                                  radius: 5.0,
-                                  backgroundColor: colors[languageIndex],
-                                ),
-                                const SizedBox(width: 4.0),
-
-                                /// language
-                                Text(
-                                  values[index].language,
-                                  style: TextStyle(color: Colors.black),
-                                ),
-                              ],
-                            )
+                                      /// language
+                                      Text(
+                                        values[index]['language'],
+                                        style: const TextStyle(
+                                            color: Colors.black),
+                                      ),
+                                    ],
+                                  )
                                 : Container(),
 
                             /// popularity
                             !isStringInvalid(
-                                text: values[index].totalStars.toString())
+                                    text:
+                                        values[index]['totalStars'].toString())
                                 ? Row(
-                              children: [
-                                const Icon(
-                                  Icons.star,
-                                  color: Colors.amber,
-                                ),
-                                const SizedBox(width: 4.0),
-                                Text(
-                                  '${values[index].totalStars}',
-                                  style: TextStyle(color: Colors.black),
-                                ),
-                              ],
-                            )
+                                    children: [
+                                      const Icon(
+                                        Icons.star,
+                                        color: Colors.amber,
+                                      ),
+                                      const SizedBox(width: 4.0),
+                                      Text(
+                                        '${values[index]['totalStars']}',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ],
+                                  )
                                 : Container(),
 
                             /// forks
                             !isStringInvalid(
-                                text: values[index].forks.toString())
+                                    text: values[index]['forks'].toString())
                                 ? Row(
-                              children: [
-                                const Icon(
-                                  Octicons.repo_forked,
-                                  color: Colors.black,
-                                ),
-                                const SizedBox(width: 4.0),
-                                Text(
-                                  values[index].forks.toString(),
-                                  style: const TextStyle(
-                                      color: Colors.black),
-                                ),
-                              ],
-                            )
+                                    children: [
+                                      const Icon(
+                                        Octicons.repo_forked,
+                                        color: Colors.black,
+                                      ),
+                                      const SizedBox(width: 4.0),
+                                      Text(
+                                        values[index]['forks'].toString(),
+                                        style: const TextStyle(
+                                            color: Colors.black),
+                                      ),
+                                    ],
+                                  )
                                 : Container(),
                           ],
                         ),

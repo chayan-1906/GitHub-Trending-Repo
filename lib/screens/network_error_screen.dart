@@ -5,11 +5,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_icons/flutter_icons.dart';
 import 'package:flutter_page_transition/flutter_page_transition.dart';
+import 'package:http/http.dart' as http;
 import 'package:trending_git_repo/screens/home_screen.dart';
 
 import '../api_calls.dart';
-import 'package:http/http.dart' as http;
-
 import '../models/git_repo_model.dart';
 
 class NetworkErrorScreen extends StatefulWidget {
@@ -28,6 +27,7 @@ class _NetworkErrorScreenState extends State<NetworkErrorScreen> {
     double width = MediaQuery.of(context).size.width;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -38,17 +38,18 @@ class _NetworkErrorScreenState extends State<NetworkErrorScreen> {
           ],
         ),
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            onPressed: () {
-              // TODO: POPUP MENU FOR STARRED REPO
-            },
-            icon: Icon(Icons.more_vert_rounded),
-          )
-        ],
+        // actions: [
+        //   IconButton(
+        //     onPressed: () {
+        //       // TODO: POPUP MENU FOR STARRED REPO
+        //     },
+        //     icon: const Icon(Icons.more_vert_rounded),
+        //   )
+        // ],
       ),
       body: Column(
         children: [
+
           /// error image
           Flexible(
             flex: 1,
@@ -63,16 +64,16 @@ class _NetworkErrorScreenState extends State<NetworkErrorScreen> {
             child: Column(
               children: [
                 /// something went wrong
-                AutoSizeText(
+                const AutoSizeText(
                   'Something went wrong...',
                   maxLines: 1,
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 25.0, fontWeight: FontWeight.w600),
                 ),
-                SizedBox(height: 8.0),
+                const SizedBox(height: 8.0),
 
                 /// an alien is probably blocking your signal.
-                AutoSizeText(
+                const AutoSizeText(
                   'An alien is probably blocking your signal.',
                   maxLines: 1,
                   textAlign: TextAlign.center,
@@ -82,7 +83,7 @@ class _NetworkErrorScreenState extends State<NetworkErrorScreen> {
                   ),
                 ),
                 // Expanded(child: Container()),
-                Spacer(),
+                const Spacer(),
 
                 /// retry button
                 GestureDetector(
@@ -102,7 +103,10 @@ class _NetworkErrorScreenState extends State<NetworkErrorScreen> {
                       Navigator.pushReplacement(
                         context,
                         PageTransition(
-                          child: HomeScreen(trendingRepos: trendingRepos),
+                          child: HomeScreen(
+                            trendingRepos: trendingRepos,
+                            // isComingFrom: 'NetworkErrorScreen',
+                          ),
                           type: PageTransitionType.rippleRightUp,
                         ),
                       );
@@ -111,12 +115,12 @@ class _NetworkErrorScreenState extends State<NetworkErrorScreen> {
                   child: Container(
                     width: width,
                     margin: EdgeInsets.symmetric(horizontal: width * 0.05),
-                    padding: EdgeInsets.all(12.0),
+                    padding: const EdgeInsets.all(12.0),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10.0),
                       border: Border.all(color: Colors.green, width: 3.0),
                     ),
-                    child: Text(
+                    child: const Text(
                       'RETRY',
                       textAlign: TextAlign.center,
                       style: TextStyle(
