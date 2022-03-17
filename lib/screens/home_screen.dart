@@ -28,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool customTileExpanded = false;
   List<dynamic> trendingRepos = [];
   bool isExpanded = false;
-  int tapped;
+  String tapped;
   Map<String, List<dynamic>> selectedRepoLang = {};
 
   Future<http.Response> callTrendingRepoApi() async {
@@ -38,12 +38,12 @@ class _HomeScreenState extends State<HomeScreen> {
     http.Response response = await Apis().trendingRepoApi(context: context);
     if (response.statusCode == 200) {
       print('Successful');
+      trendingRepos.clear();
       final repoListFromResponse = jsonDecode(response.body);
       for (var repoInJson in repoListFromResponse) {
         var repoFromJson = GitRepoModel.fromJson(repoInJson);
         trendingRepos.add(repoFromJson);
       }
-      // print(trendingRepos.toList());
       for (var trendingRepoItem in trendingRepos) {
         selectedRepoLang.addEntries([
           MapEntry(
@@ -155,260 +155,306 @@ class _HomeScreenState extends State<HomeScreen> {
               onRefresh: () => refresh(),
               child: ListView.builder(
                 padding: const EdgeInsets.all(10.0),
-                itemCount: trendingRepos.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final githubRepoItem = trendingRepos[index];
-                  String formattedColor;
-                  if (!isStringInvalid(text: githubRepoItem.languageColor)) {
-                    formattedColor =
-                        "0xFF${githubRepoItem.languageColor.replaceAll('#', '')}";
-                  } else {
-                    formattedColor = '0xFFFFFFFF';
-                  }
-                  Color color =
-                      !isStringInvalid(text: githubRepoItem.languageColor)
-                          ? Color(int.parse(formattedColor))
-                          : const Color(0xFFFFFFFF);
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        isExpanded = ((tapped == null) ||
-                                ((index == tapped) || !isExpanded))
-                            ? !isExpanded
-                            : isExpanded;
-                        tapped = index;
+                itemCount: selectedRepoLang.keys.length,
+                itemBuilder: (BuildContext context, int languageIndex) {
+                  print(selectedRepoLang.keys.length);
+                  List keyLanguages = selectedRepoLang.keys.toList();
+                  List colors = [];
+                  selectedRepoLang.values.forEach((element) {
+                    // print(element);
+                    String formattedColor;
+                    Color color;
+                    if (element != null &&
+                        element != 'null' &&
+                        element.isNotEmpty) {
+                      element.forEach((elementIterator) {
+                        if (!isStringInvalid(
+                            text: elementIterator.languageColor)) {
+                          /// if color is not null
+                          formattedColor =
+                              "0xFF${elementIterator.languageColor.replaceAll('#', '')}";
+                          color = Color(int.parse(formattedColor));
+                        } else {
+                          color = Color(0xFFFFFFFF);
+                        }
                       });
-                    },
-                    child: ExpandableContainer(
-                      expanded: index == tapped ? isExpanded : false,
-                      collapsedChild: Container(
+                    }
+                    colors.add(color);
+                  });
+                  return ListView(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+                    children: [
+                      /// language name
+                      Container(
                         decoration: BoxDecoration(
-                          // color: Colors.redAccent,
+                          color: colors[languageIndex].withOpacity(0.7),
                           borderRadius: BorderRadius.circular(12.0),
+                          border: Border.all(
+                            color: colors[languageIndex],
+                            width: 2.0,
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            /// profile avatar
-                            SizedBox(
-                              width: 50.0,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(50.0),
-                                child: CachedNetworkImage(
-                                  // TODO: Whose avatar url???
-                                  imageUrl: githubRepoItem.builtBy[0]['avatar'],
-                                  fit: BoxFit.cover,
-                                  height: 50.0,
-                                  width: 50.0,
-                                  placeholder: (context, url) => Image.asset(
-                                    'assets/images/profile_image.png',
-                                    width: MediaQuery.of(context).size.width *
-                                        0.60,
-                                    fit: BoxFit.contain,
-                                  ),
-                                  errorWidget: (context, url, error) =>
-                                      Image.network(
-                                    'https://www.gemkom.com.tr/wp-content/uploads/2020/02/NO_IMG_600x600-1.png',
-                                    fit: BoxFit.contain,
-                                    width: MediaQuery.of(context).size.width *
-                                        0.60,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 20.0),
-
-                            /// username & repo name
-                            SizedBox(
-                              width: width -
-                                  100.0, // screenWidth - profileAvatarWidth - padding (approx.)
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  /// username
-                                  Text(
-                                    githubRepoItem.username,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 14.0,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8.0),
-
-                                  /// repo name
-                                  Text(
-                                    githubRepoItem.repositoryName,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18.0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 10.0,
+                          horizontal: 15.0,
+                        ),
+                        child: Text(
+                          keyLanguages[languageIndex] ?? 'NULL LANGUAGE',
+                          style: TextStyle(
+                            fontSize: 20.0,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      expandedChild: Container(
-                        decoration: BoxDecoration(
-                          // color: Colors.redAccent,
-                          borderRadius: BorderRadius.circular(12.0),
-                        ),
-                        child: Row(
-                          children: [
-                            /// profile avatar
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(50.0),
-                              child: CachedNetworkImage(
-                                // TODO: Whose avatar url???
-                                imageUrl: githubRepoItem.builtBy[0]['avatar'],
-                                fit: BoxFit.cover,
-                                height: 50.0,
-                                width: 50.0,
-                                placeholder: (context, url) => Image.asset(
-                                  'assets/images/profile_image.png',
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.60,
-                                  fit: BoxFit.contain,
-                                ),
-                                errorWidget: (context, url, error) =>
-                                    Image.network(
-                                  'https://www.gemkom.com.tr/wp-content/uploads/2020/02/NO_IMG_600x600-1.png',
-                                  fit: BoxFit.contain,
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.60,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 20.0),
 
-                            /// username & repo name
-                            Container(
-                              width: width * 0.70,
-                              child: ListView(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                // crossAxisAlignment: CrossAxisAlignment.start,
-                                // mainAxisAlignment:
-                                //     MainAxisAlignment.spaceBetween,
-                                children: [
-                                  /// username
-                                  Text(
-                                    !isStringInvalid(
-                                            text: githubRepoItem.username)
-                                        ? githubRepoItem.username
-                                        : 'N/A',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 16.0,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10.0),
-
-                                  /// repo name
-                                  Text(
-                                    githubRepoItem.repositoryName,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18.0,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10.0),
-
-                                  /// description
-                                  !isStringInvalid(
-                                          text: githubRepoItem.description)
-                                      ? Text(
-                                          githubRepoItem.description,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            fontSize: 15.0,
-                                            color: Colors.black,
-                                          ),
-                                        )
-                                      : Container(),
-                                  const SizedBox(height: 10.0),
-
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      /// language
-                                      !isStringInvalid(
-                                              text:
-                                                  githubRepoItem.languageColor)
-                                          ? Row(
-                                              children: [
-                                                /// language color
-                                                CircleAvatar(
-                                                  radius: 5.0,
-                                                  backgroundColor: color,
-                                                ),
-                                                const SizedBox(width: 4.0),
-
-                                                /// language
-                                                Text(
-                                                  githubRepoItem.language,
-                                                  style: TextStyle(
-                                                      color: Colors.black),
-                                                ),
-                                              ],
-                                            )
-                                          : Container(),
-
-                                      /// popularity
-                                      !isStringInvalid(
-                                              text: githubRepoItem.totalStars
-                                                  .toString())
-                                          ? Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.star,
-                                                  color: Colors.amber,
-                                                ),
-                                                const SizedBox(width: 4.0),
-                                                Text(
-                                                  '${githubRepoItem.totalStars}',
-                                                  style: TextStyle(
-                                                      color: Colors.black),
-                                                ),
-                                              ],
-                                            )
-                                          : Container(),
-
-                                      /// forks
-                                      !isStringInvalid(
-                                              text: githubRepoItem.forks
-                                                  .toString())
-                                          ? Row(
-                                              children: [
-                                                const Icon(
-                                                  Octicons.repo_forked,
-                                                  color: Colors.black,
-                                                ),
-                                                const SizedBox(width: 4.0),
-                                                Text(
-                                                  '${githubRepoItem.forks}',
-                                                  style: const TextStyle(
-                                                      color: Colors.black),
-                                                ),
-                                              ],
-                                            )
-                                          : Container(),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                      /// repo list of specific language
+                      RepositoryList(languageIndex, width, colors),
+                    ],
                   );
                 },
               ),
             ),
+    );
+  }
+
+  ListView RepositoryList(
+      int languageIndex, double width, List<dynamic> colors) {
+    // print('repositoryIndex: $repositoryIndex');
+    List keys = selectedRepoLang.keys.toList();
+    List values = selectedRepoLang[keys[languageIndex]];
+    print('225: ${selectedRepoLang[keys[languageIndex]]}');
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      itemCount: values.length,
+      itemBuilder: (BuildContext context, int index) {
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              isExpanded = ((tapped == null) ||
+                      (('$languageIndex$index' == tapped) || !isExpanded))
+                  ? !isExpanded
+                  : isExpanded;
+              tapped = '$languageIndex$index';
+            });
+          },
+          child: ExpandableContainer(
+            expanded: '$languageIndex$index' == tapped ? isExpanded : false,
+            collapsedChild: Container(
+              decoration: BoxDecoration(
+                // color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Row(
+                children: [
+                  /// profile avatar
+                  SizedBox(
+                    width: 50.0,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(50.0),
+                      child: CachedNetworkImage(
+                        // TODO: Whose avatar url???
+                        imageUrl: values[index].builtBy[0]['avatar'],
+                        fit: BoxFit.cover,
+                        height: 50.0,
+                        width: 50.0,
+                        placeholder: (context, url) => Image.asset(
+                          'assets/images/profile_image.png',
+                          width: MediaQuery.of(context).size.width * 0.60,
+                          fit: BoxFit.contain,
+                        ),
+                        errorWidget: (context, url, error) => Image.network(
+                          'https://www.gemkom.com.tr/wp-content/uploads/2020/02/NO_IMG_600x600-1.png',
+                          fit: BoxFit.contain,
+                          width: MediaQuery.of(context).size.width * 0.60,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 20.0),
+
+                  /// username & repo name
+                  SizedBox(
+                    width: width -
+                        100.0, // screenWidth - profileAvatarWidth - padding (approx.)
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        /// username
+                        Text(
+                          !isStringInvalid(text: values[index].username)
+                              ? values[index].username
+                              : 'N/A',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 14.0,
+                          ),
+                        ),
+                        const SizedBox(height: 8.0),
+
+                        /// repo name
+                        Text(
+                          values[index].repositoryName,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 18.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            expandedChild: Container(
+              decoration: BoxDecoration(
+                // color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Row(
+                children: [
+                  /// profile avatar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(50.0),
+                    child: CachedNetworkImage(
+                      // TODO: Whose avatar url???
+                      imageUrl: values[index].builtBy[0]['avatar'],
+                      fit: BoxFit.cover,
+                      height: 50.0,
+                      width: 50.0,
+                      placeholder: (context, url) => Image.asset(
+                        'assets/images/profile_image.png',
+                        width: MediaQuery.of(context).size.width * 0.60,
+                        fit: BoxFit.contain,
+                      ),
+                      errorWidget: (context, url, error) => Image.network(
+                        'https://www.gemkom.com.tr/wp-content/uploads/2020/02/NO_IMG_600x600-1.png',
+                        fit: BoxFit.contain,
+                        width: MediaQuery.of(context).size.width * 0.60,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 20.0),
+
+                  /// username & repo name
+                  Container(
+                    width: width * 0.70,
+                    child: ListView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        /// username
+                        Text(
+                          !isStringInvalid(text: values[index].username)
+                              ? values[index].username
+                              : 'N/A',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 16.0,
+                          ),
+                        ),
+                        const SizedBox(height: 10.0),
+
+                        /// repo name
+                        Text(
+                          !isStringInvalid(text: values[index].repositoryName)
+                              ? values[index].repositoryName
+                              : '',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 18.0,
+                          ),
+                        ),
+                        const SizedBox(height: 10.0),
+
+                        /// description
+                        !isStringInvalid(text: values[index].description)
+                            ? Text(
+                                values[index].description,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 15.0,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : Container(),
+                        const SizedBox(height: 10.0),
+
+                        /// language,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            /// language
+                            !isStringInvalid(text: values[index].languageColor)
+                                ? Row(
+                                    children: [
+                                      /// language color
+                                      CircleAvatar(
+                                        radius: 5.0,
+                                        backgroundColor: colors[languageIndex],
+                                      ),
+                                      const SizedBox(width: 4.0),
+
+                                      /// language
+                                      Text(
+                                        values[index].language,
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ],
+                                  )
+                                : Container(),
+
+                            /// popularity
+                            !isStringInvalid(
+                                    text: values[index].totalStars.toString())
+                                ? Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.star,
+                                        color: Colors.amber,
+                                      ),
+                                      const SizedBox(width: 4.0),
+                                      Text(
+                                        '${values[index].totalStars}',
+                                        style: TextStyle(color: Colors.black),
+                                      ),
+                                    ],
+                                  )
+                                : Container(),
+
+                            /// forks
+                            !isStringInvalid(
+                                    text: values[index].forks.toString())
+                                ? Row(
+                                    children: [
+                                      const Icon(
+                                        Octicons.repo_forked,
+                                        color: Colors.black,
+                                      ),
+                                      const SizedBox(width: 4.0),
+                                      Text(
+                                        values[index].forks.toString(),
+                                        style: const TextStyle(
+                                            color: Colors.black),
+                                      ),
+                                    ],
+                                  )
+                                : Container(),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
