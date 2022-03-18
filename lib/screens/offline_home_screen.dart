@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_icons/flutter_icons.dart';
 import 'package:flutter_page_transition/flutter_page_transition.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trending_git_repo/screens/home_screen.dart';
@@ -13,6 +14,7 @@ import '../global_functions/check_invalid_string.dart';
 import '../models/git_repo_model.dart';
 import '../services/shared_preference_service.dart';
 import '../widgets/expandable_container.dart';
+import 'fav_repo_screen.dart';
 import 'network_error_screen.dart';
 
 class OfflineHomeScreen extends StatefulWidget {
@@ -32,6 +34,8 @@ class _OfflineHomeScreenState extends State<OfflineHomeScreen> {
   String encodedRepoFromJson = '';
   List<String> encodedTrendingRepos = [];
   SharedPreferenceService sharedPreferenceService = SharedPreferenceService();
+  List<dynamic> decodedFavRepos = [];
+  List<String> encodedFavRepos = [];
 
   Future<http.Response> callTrendingRepoApi() async {
     SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
@@ -99,7 +103,13 @@ class _OfflineHomeScreenState extends State<OfflineHomeScreen> {
         padding: const EdgeInsets.all(0.0),
         onSelected: (value) {
           print(value);
-          // TODO: Navigate to favourites screen
+          Navigator.push(
+            context,
+            PageTransition(
+              child: const FavRepoScreen(),
+              type: PageTransitionType.rippleRightUp,
+            ),
+          );
         },
         itemBuilder: (BuildContext context) {
           print('showPopupMenu');
@@ -149,7 +159,6 @@ class _OfflineHomeScreenState extends State<OfflineHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    double height = MediaQuery.of(context).size.height;
     double width = MediaQuery.of(context).size.width;
 
     return Scaffold(
@@ -277,19 +286,156 @@ class _OfflineHomeScreenState extends State<OfflineHomeScreen> {
               tapped = '$languageIndex$index';
             });
           },
-          child: ExpandableContainer(
-            expanded: '$languageIndex$index' == tapped ? isExpanded : false,
-            collapsedChild: Container(
-              decoration: BoxDecoration(
-                // color: Colors.redAccent,
-                borderRadius: BorderRadius.circular(12.0),
+          child: Slidable(
+            actionPane: const SlidableStrechActionPane(),
+            actionExtentRatio: 0.20,
+            secondaryActions: [
+              /// favourite
+              IconSlideAction(
+                caption: 'Favourite',
+                icon: Icons.favorite,
+                color: Colors.redAccent,
+                onTap: () async {
+                  /// fetch favRepo list from shared preferences key in decoded form
+                  SharedPreferences sharedPreferences =
+                      await SharedPreferences.getInstance();
+                  List<String> storedFavRepos = sharedPreferences.getStringList(
+                          SharedPreferenceService.FAV_REPO_LIST_KEY) ??
+                      [];
+                  decodedFavRepos = [];
+                  List usernames = [];
+                  for (var element in storedFavRepos) {
+                    decodedFavRepos.add(json.decode(element));
+                  }
+                  print('308: $decodedFavRepos');
+                  encodedFavRepos = [];
+
+                  if (decodedFavRepos.isNotEmpty) {
+                    for (var element in decodedFavRepos) {
+                      /// check the username already exists in fav
+                      // print("315: ${element['username']}");
+                      usernames.add(element['username']);
+                      if (usernames.contains(values[index]['username'])) {
+                        print('return');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Repository already exists'),
+                          ),
+                        );
+                        return;
+                      }
+                      encodedFavRepos.add(jsonEncode(element));
+                    }
+                  }
+                  String encodedFavItem = '';
+                  for (var element in values) {
+                    if (element['username'] == values[index]['username']) {
+                      encodedFavItem = jsonEncode(element);
+                      encodedFavRepos.add(encodedFavItem);
+                      // favRepos = [];
+                    }
+                  }
+                  print('373 encodedFavRepos: $encodedFavRepos');
+
+                  /// store fav items in shared preferences list in encoded form
+                  sharedPreferenceService.setFavRepoListValue(
+                      favRepos: encodedFavRepos);
+                  // print(expandedCardValue);
+                  // for (var favRepoItem in favRepos) {
+                  //   favRepoLang.addEntries([
+                  //     MapEntry(
+                  //       /// key
+                  //       favRepoItem.language,
+                  //
+                  //       /// value
+                  //       trendingRepos
+                  //           .where((favRepo) =>
+                  //               favRepo.language == favRepoItem.language)
+                  //           .toList(),
+                  //     ),
+                  //   ]);
+                  // }
+                },
               ),
-              child: Row(
-                children: [
-                  /// profile avatar
-                  SizedBox(
-                    width: 50.0,
-                    child: ClipRRect(
+            ],
+            child: ExpandableContainer(
+              expanded: '$languageIndex$index' == tapped ? isExpanded : false,
+              collapsedChild: Container(
+                decoration: BoxDecoration(
+                  // color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Row(
+                  children: [
+                    /// profile avatar
+                    SizedBox(
+                      width: 50.0,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(50.0),
+                        child: CachedNetworkImage(
+                          // TODO: Whose avatar url???
+                          imageUrl: values[index]['builtBy'][0]['avatar'],
+                          fit: BoxFit.cover,
+                          height: 50.0,
+                          width: 50.0,
+                          placeholder: (context, url) => Image.asset(
+                            'assets/images/profile_image.png',
+                            width: MediaQuery.of(context).size.width * 0.60,
+                            fit: BoxFit.contain,
+                          ),
+                          errorWidget: (context, url, error) => Image.network(
+                            'https://www.gemkom.com.tr/wp-content/uploads/2020/02/NO_IMG_600x600-1.png',
+                            fit: BoxFit.contain,
+                            width: MediaQuery.of(context).size.width * 0.60,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20.0),
+
+                    /// username & repo name
+                    SizedBox(
+                      width: width - 100.0,
+                      // screenWidth - profileAvatarWidth - padding (approx.)
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          /// username
+                          Text(
+                            !isStringInvalid(text: values[index]['username'])
+                                ? values[index]['username']
+                                : 'N/A',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 14.0,
+                            ),
+                          ),
+                          const SizedBox(height: 8.0),
+
+                          /// repo name
+                          Text(
+                            values[index]['repositoryName'],
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 18.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              expandedChild: Container(
+                decoration: BoxDecoration(
+                  // color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Row(
+                  children: [
+                    /// profile avatar
+                    ClipRRect(
                       borderRadius: BorderRadius.circular(50.0),
                       child: CachedNetworkImage(
                         // TODO: Whose avatar url???
@@ -309,188 +455,125 @@ class _OfflineHomeScreenState extends State<OfflineHomeScreen> {
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 20.0),
+                    const SizedBox(width: 20.0),
 
-                  /// username & repo name
-                  SizedBox(
-                    width: width - 100.0,
-                    // screenWidth - profileAvatarWidth - padding (approx.)
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// username
-                        Text(
-                          !isStringInvalid(text: values[index]['username'])
-                              ? values[index]['username']
-                              : 'N/A',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 14.0,
+                    /// username & repo name
+                    Container(
+                      width: width * 0.70,
+                      child: ListView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        children: [
+                          /// username
+                          Text(
+                            !isStringInvalid(text: values[index]['username'])
+                                ? values[index]['username']
+                                : 'N/A',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 16.0,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8.0),
+                          const SizedBox(height: 10.0),
 
-                        /// repo name
-                        Text(
-                          values[index]['repositoryName'],
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 18.0,
+                          /// repo name
+                          Text(
+                            !isStringInvalid(
+                                    text: values[index]['repositoryName'])
+                                ? values[index]['repositoryName']
+                                : '',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 18.0,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            expandedChild: Container(
-              decoration: BoxDecoration(
-                // color: Colors.redAccent,
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              child: Row(
-                children: [
-                  /// profile avatar
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(50.0),
-                    child: CachedNetworkImage(
-                      // TODO: Whose avatar url???
-                      imageUrl: values[index]['builtBy'][0]['avatar'],
-                      fit: BoxFit.cover,
-                      height: 50.0,
-                      width: 50.0,
-                      placeholder: (context, url) => Image.asset(
-                        'assets/images/profile_image.png',
-                        width: MediaQuery.of(context).size.width * 0.60,
-                        fit: BoxFit.contain,
+                          const SizedBox(height: 10.0),
+
+                          /// description
+                          !isStringInvalid(text: values[index]['description'])
+                              ? Text(
+                                  values[index]['description'],
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15.0,
+                                    color: Colors.black,
+                                  ),
+                                )
+                              : Container(),
+                          const SizedBox(height: 10.0),
+
+                          /// language,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              /// language
+                              !isStringInvalid(
+                                      text: values[index]['languageColor'])
+                                  ? Row(
+                                      children: [
+                                        /// language color
+                                        CircleAvatar(
+                                          radius: 5.0,
+                                          backgroundColor:
+                                              colors[languageIndex],
+                                        ),
+                                        const SizedBox(width: 4.0),
+
+                                        /// language
+                                        Text(
+                                          values[index]['language'],
+                                          style: const TextStyle(
+                                              color: Colors.black),
+                                        ),
+                                      ],
+                                    )
+                                  : Container(),
+
+                              /// popularity
+                              !isStringInvalid(
+                                      text: values[index]['totalStars']
+                                          .toString())
+                                  ? Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.star,
+                                          color: Colors.amber,
+                                        ),
+                                        const SizedBox(width: 4.0),
+                                        Text(
+                                          '${values[index]['totalStars']}',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ],
+                                    )
+                                  : Container(),
+
+                              /// forks
+                              !isStringInvalid(
+                                      text: values[index]['forks'].toString())
+                                  ? Row(
+                                      children: [
+                                        const Icon(
+                                          Octicons.repo_forked,
+                                          color: Colors.black,
+                                        ),
+                                        const SizedBox(width: 4.0),
+                                        Text(
+                                          values[index]['forks'].toString(),
+                                          style: const TextStyle(
+                                              color: Colors.black),
+                                        ),
+                                      ],
+                                    )
+                                  : Container(),
+                            ],
+                          ),
+                        ],
                       ),
-                      errorWidget: (context, url, error) => Image.network(
-                        'https://www.gemkom.com.tr/wp-content/uploads/2020/02/NO_IMG_600x600-1.png',
-                        fit: BoxFit.contain,
-                        width: MediaQuery.of(context).size.width * 0.60,
-                      ),
                     ),
-                  ),
-                  const SizedBox(width: 20.0),
-
-                  /// username & repo name
-                  Container(
-                    width: width * 0.70,
-                    child: ListView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        /// username
-                        Text(
-                          !isStringInvalid(text: values[index]['username'])
-                              ? values[index]['username']
-                              : 'N/A',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 16.0,
-                          ),
-                        ),
-                        const SizedBox(height: 10.0),
-
-                        /// repo name
-                        Text(
-                          !isStringInvalid(
-                                  text: values[index]['repositoryName'])
-                              ? values[index]['repositoryName']
-                              : '',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 18.0,
-                          ),
-                        ),
-                        const SizedBox(height: 10.0),
-
-                        /// description
-                        !isStringInvalid(text: values[index]['description'])
-                            ? Text(
-                                values[index]['description'],
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 15.0,
-                                  color: Colors.black,
-                                ),
-                              )
-                            : Container(),
-                        const SizedBox(height: 10.0),
-
-                        /// language,
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            /// language
-                            !isStringInvalid(
-                                    text: values[index]['languageColor'])
-                                ? Row(
-                                    children: [
-                                      /// language color
-                                      CircleAvatar(
-                                        radius: 5.0,
-                                        backgroundColor: colors[languageIndex],
-                                      ),
-                                      const SizedBox(width: 4.0),
-
-                                      /// language
-                                      Text(
-                                        values[index]['language'],
-                                        style: const TextStyle(
-                                            color: Colors.black),
-                                      ),
-                                    ],
-                                  )
-                                : Container(),
-
-                            /// popularity
-                            !isStringInvalid(
-                                    text:
-                                        values[index]['totalStars'].toString())
-                                ? Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.star,
-                                        color: Colors.amber,
-                                      ),
-                                      const SizedBox(width: 4.0),
-                                      Text(
-                                        '${values[index]['totalStars']}',
-                                        style: TextStyle(color: Colors.black),
-                                      ),
-                                    ],
-                                  )
-                                : Container(),
-
-                            /// forks
-                            !isStringInvalid(
-                                    text: values[index]['forks'].toString())
-                                ? Row(
-                                    children: [
-                                      const Icon(
-                                        Octicons.repo_forked,
-                                        color: Colors.black,
-                                      ),
-                                      const SizedBox(width: 4.0),
-                                      Text(
-                                        values[index]['forks'].toString(),
-                                        style: const TextStyle(
-                                            color: Colors.black),
-                                      ),
-                                    ],
-                                  )
-                                : Container(),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
