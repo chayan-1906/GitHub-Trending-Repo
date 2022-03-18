@@ -49,15 +49,14 @@ class _FavRepoScreenState extends State<FavRepoScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite, size: width * 0.07),
-            Flexible(child: SizedBox(width: width * 0.05)),
-            const Text('Favourites'),
-          ],
-        ),
+        title: const Text('Favourites'),
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: const Icon(Icons.arrow_back_ios_rounded),
+        ),
       ),
       body: decodedFavRepos.isEmpty
           ? const Center(
